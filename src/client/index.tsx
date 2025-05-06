@@ -10,13 +10,43 @@ import {
 } from "react-router";
 import { nanoid } from "nanoid";
 
-import { names, type ChatMessage, type Message } from "../shared";
+import { type ChatMessage, type Message } from "../shared";
 
-function App() {
-  const [currentUser] = useState(names[Math.floor(Math.random() * names.length)]);
+// Komponen untuk Input Nama
+function NameInput({ onNameSubmit }: { onNameSubmit: (name: string) => void }) {
+  const [name, setName] = useState("");
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (name.trim() === "") {
+      alert("Please enter your name.");
+      return;
+    }
+    onNameSubmit(name.trim());
+  };
+
+  return (
+    <div className="name-input-container">
+      <form onSubmit={handleSubmit} className="name-input-form">
+        <h2>Enter Your Name</h2>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Your Name"
+          aria-label="Your Name"
+          autoFocus
+        />
+        <button type="submit">Start Chatting</button>
+      </form>
+    </div>
+  );
+}
+
+// Komponen untuk Antarmuka Chat
+function ChatInterface({ userName, room }: { userName: string; room: string | undefined }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const { room } = useParams();
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -26,17 +56,17 @@ function App() {
   useEffect(scrollToBottom, [messages]);
 
   const socket = usePartySocket({
-    party: "chat", // Make sure this matches your party server name in wrangler.toml
-    room, // This is your room ID from the URL
+    party: "Chat", // Pastikan ini cocok dengan class_name Durable Object Anda di wrangler.json
+    room,
     onOpen: () => {
-      console.log(`Connected to room: ${room} as ${currentUser}`);
+      console.log(`Connected to room: ${room} as ${userName}`);
     },
     onMessage: (evt) => {
       const message = JSON.parse(evt.data as string) as Message;
       if (message.type === "all") {
         setMessages(message.messages);
       } else if (message.type === "add") {
-        // Check if message already exists (e.g., if it's our own message echoed back)
+        // Cek apakah pesan sudah ada untuk menghindari duplikasi dari echo server
         if (!messages.find(m => m.id === message.id)) {
           setMessages((prevMessages) => [
             ...prevMessages,
@@ -48,7 +78,7 @@ function App() {
             },
           ]);
         }
-      } else if (message.type === "update") { // Example for update, if you implement it
+      } else if (message.type === "update") {
         setMessages((prevMessages) =>
           prevMessages.map((m) =>
             m.id === message.id
@@ -73,11 +103,11 @@ function App() {
     const chatMessage: ChatMessage = {
       id: nanoid(8),
       content: inputValue,
-      user: currentUser,
+      user: userName,
       role: "user",
     };
 
-    // Optimistically add message to UI
+    // Optimistic update
     setMessages((prevMessages) => [...prevMessages, chatMessage]);
     
     socket.send(
@@ -91,24 +121,24 @@ function App() {
   };
 
   return (
-    <> {/* Replaced parent div with React Fragment as .chat-main is already the container */}
+    <> {/* Parent Fragment */}
       <div className="chat-messages">
         {messages.map((message) => (
           <div
             key={message.id}
             className={`message-item ${
-              message.user === currentUser ? "user-message" : "other-message"
+              message.user === userName ? "user-message" : "other-message"
             }`}
           >
             <div className="message-sender">
-              {message.user === currentUser ? "You" : message.user}
+              {message.user === userName ? "You" : message.user}
             </div>
             <div className="message-bubble">
               <p className="message-content">{message.content}</p>
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} /> {/* For auto-scrolling */}
+        <div ref={messagesEndRef} /> {/* Element untuk auto-scroll */}
       </div>
       <form className="chat-input-form" onSubmit={handleSubmit}>
         <input
@@ -116,32 +146,53 @@ function App() {
           name="content"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder={`Chatting as ${currentUser}...`}
+          placeholder={`Chatting as ${userName}...`}
           autoComplete="off"
           aria-label="Chat message input"
         />
-        <button type="submit" disabled={inputValue.trim() === ""}>
-          Send
+        <button type="submit" disabled={inputValue.trim() === ""} aria-label="Send message">
+          <i className="fas fa-paper-plane"></i> {/* Ikon Font Awesome */}
         </button>
       </form>
     </>
   );
 }
 
-// Main rendering logic
+// Komponen App Utama (mengatur logika input nama atau tampilkan chat)
+function App() {
+  const [currentUser, setCurrentUser] = useState<string | null>(() => {
+    return localStorage.getItem("chatUserName"); // Coba ambil nama dari localStorage
+  });
+  const { room } = useParams(); // Ambil room ID dari URL
+
+  const handleNameSubmit = (name: string) => {
+    localStorage.setItem("chatUserName", name); // Simpan nama ke localStorage
+    setCurrentUser(name);
+  };
+
+  if (!currentUser) {
+    // Jika tidak ada nama, tampilkan form input nama
+    return <NameInput onNameSubmit={handleNameSubmit} />;
+  }
+
+  // Jika nama sudah ada, tampilkan antarmuka chat
+  return <ChatInterface userName={currentUser} room={room} />;
+}
+
+// Logika Rendering Utama
 const container = document.getElementById("root");
 if (container) {
   createRoot(container).render(
     <React.StrictMode>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to={`/${nanoid()}`} />} />
-          <Route path="/:room" element={<App />} />
-          <Route path="*" element={<Navigate to="/" />} />
+          <Route path="/" element={<Navigate to={`/${nanoid()}`} />} /> {/* Redirect ke room acak jika akses root */}
+          <Route path="/:room" element={<App />} /> {/* Rute untuk room spesifik */}
+          <Route path="*" element={<Navigate to="/" />} /> {/* Fallback redirect */}
         </Routes>
       </BrowserRouter>
     </React.StrictMode>
   );
 } else {
-  console.error("Failed to find the root element");
+  console.error("Failed to find the root element to mount the React app.");
 }
