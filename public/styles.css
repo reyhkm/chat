@@ -30,23 +30,25 @@ body, html {
   color: #007bff;
 }
 
+/* INI BAGIAN PENTING UNTUK LAYOUT CHAT */
 .chat-main {
   flex-grow: 1; /* Takes remaining space */
-  display: flex;
-  flex-direction: column;
+  display: flex; /* WAJIB ADA */
+  flex-direction: column; /* WAJIB ADA: items (messages, form) stacked vertically */
   background-color: #ffffff;
-  overflow: hidden; /* Important for chat layout */
+  overflow: hidden; /* Kontainer utama tidak scroll, area pesan yang scroll */
 }
 
-/* Chat Area Specifics */
 .chat-messages {
-  flex-grow: 1;
-  overflow-y: auto;
+  flex-grow: 1; /* WAJIB ADA: messages area takes all available vertical space */
+  overflow-y: auto; /* Allows scrolling for messages */
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 12px; /* Space between messages */
 }
+/* AKHIR BAGIAN PENTING UNTUK LAYOUT CHAT */
+
 
 .message-item {
   display: flex;
@@ -102,6 +104,7 @@ body, html {
   padding: 15px;
   border-top: 1px solid #dee2e6;
   background-color: #f8f9fa;
+  /* flex-shrink: 0; JANGAN BIARKAN INPUT AREA MENGECIL, jika diperlukan */
 }
 
 .chat-input-form input[type="text"] {
@@ -148,7 +151,6 @@ body, html {
     border-right: none;
     overflow: hidden; /* Make sure content doesn't spill */
   }
-  /* If you want a toggleable sidebar, you'd add more complex JS and CSS */
 
   .message-item {
     max-width: 85%;
