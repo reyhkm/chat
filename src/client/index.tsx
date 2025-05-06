@@ -47,58 +47,92 @@ function NameInput({ onNameSubmit }: { onNameSubmit: (name: string) => void }) {
 function ChatInterface({ userName, room }: { userName: string; room: string | undefined }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
+  const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
 
+  console.log(`ChatInterface rendering for user: ${userName}, room: ${room}. Messages count: ${messages.length}`);
+
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Sedikit penundaan mungkin membantu jika render belum selesai
+    setTimeout(() => {
+       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 100);
   };
 
-  useEffect(scrollToBottom, [messages]);
+  useEffect(() => {
+      // Coba scroll saat pesan berubah atau saat baru terhubung
+      if(messages.length > 0 || isConnected) {
+          scrollToBottom();
+      }
+  }, [messages, isConnected]); // Tambahkan isConnected sebagai dependency
 
   const socket = usePartySocket({
-    party: "Chat", // Pastikan ini cocok dengan class_name Durable Object Anda di wrangler.json
+    party: "Chat", // Sesuaikan dengan nama Class Durable Object Anda di wrangler.json
     room,
     onOpen: () => {
-      console.log(`Connected to room: ${room} as ${userName}`);
+      console.log(`[WebSocket] Connected to room: ${room} as ${userName}`);
+      setIsConnected(true);
     },
     onMessage: (evt) => {
-      const message = JSON.parse(evt.data as string) as Message;
-      if (message.type === "all") {
-        setMessages(message.messages);
-      } else if (message.type === "add") {
-        // Cek apakah pesan sudah ada untuk menghindari duplikasi dari echo server
-        if (!messages.find(m => m.id === message.id)) {
-          setMessages((prevMessages) => [
-            ...prevMessages,
-            {
-              id: message.id,
-              content: message.content,
-              user: message.user,
-              role: message.role,
-            },
-          ]);
+      try {
+        const message = JSON.parse(evt.data as string) as Message;
+        console.log("[WebSocket] Received message:", message);
+
+        if (message.type === "all") {
+          console.log(`[WebSocket] Received 'all' messages (${message.messages.length}). Current state has ${messages.length}.`);
+          setMessages(message.messages);
+          console.log("[State] Messages updated with history.");
+        } else if (message.type === "add") {
+          setMessages((prevMessages) => {
+            if (!prevMessages.find(m => m.id === message.id)) {
+               console.log("[State] Adding new message:", message.id);
+              return [
+                ...prevMessages,
+                {
+                  id: message.id,
+                  content: message.content,
+                  user: message.user,
+                  role: message.role,
+                },
+              ];
+            } else {
+              console.log("[State] Message already exists (likely echo), skipping:", message.id);
+              return prevMessages;
+            }
+          });
+        } else if (message.type === "update") {
+           console.log("[State] Updating message:", message.id);
+          setMessages((prevMessages) =>
+            prevMessages.map((m) =>
+              m.id === message.id
+                ? { ...m, content: message.content, user: message.user, role: message.role }
+                : m
+            )
+          );
         }
-      } else if (message.type === "update") {
-        setMessages((prevMessages) =>
-          prevMessages.map((m) =>
-            m.id === message.id
-              ? { ...m, content: message.content, user: message.user, role: message.role }
-              : m
-          )
-        );
+      } catch (error) {
+        console.error("[WebSocket] Failed to parse message or update state:", error);
+        console.error("[WebSocket] Raw message data:", evt.data);
       }
     },
-    onClose: () => {
-      console.log(`Disconnected from room: ${room}`);
+    onClose: (event) => {
+      console.log(`[WebSocket] Disconnected from room: ${room}. Code: ${event.code}, Reason: ${event.reason}`);
+      setIsConnected(false);
     },
     onError: (err) => {
-      console.error(`Error in room ${room}:`, err);
+      console.error(`[WebSocket] Error in room ${room}:`, err);
+      // onError tidak selalu berarti koneksi tertutup, tapi kita set false untuk aman
+      setIsConnected(false);
     }
   });
 
+  useEffect(() => {
+    console.log("[Render] ChatInterface re-rendered. Current messages state length:", messages.length);
+  }, [messages]);
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (inputValue.trim() === "") return;
+    if (inputValue.trim() === "" || !isConnected) return;
 
     const chatMessage: ChatMessage = {
       id: nanoid(8),
@@ -107,9 +141,11 @@ function ChatInterface({ userName, room }: { userName: string; room: string | un
       role: "user",
     };
 
-    // Optimistic update
+    console.log("[Action] Sending message:", chatMessage.id);
+    // Optimistic update: Tambahkan ke UI segera
     setMessages((prevMessages) => [...prevMessages, chatMessage]);
-    
+    console.log("[State] Optimistically added message:", chatMessage.id);
+
     socket.send(
       JSON.stringify({
         type: "add",
@@ -121,7 +157,7 @@ function ChatInterface({ userName, room }: { userName: string; room: string | un
   };
 
   return (
-    <> {/* Parent Fragment */}
+    <>
       <div className="chat-messages">
         {messages.map((message) => (
           <div
@@ -134,11 +170,20 @@ function ChatInterface({ userName, room }: { userName: string; room: string | un
               {message.user === userName ? "You" : message.user}
             </div>
             <div className="message-bubble">
+              {/* Pastikan tag <p> tidak memiliki margin bawah default yang mengganggu */}
               <p className="message-content">{message.content}</p>
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} /> {/* Element untuk auto-scroll */}
+        {/* Pesan status jika chat kosong atau tidak terhubung */}
+         {messages.length === 0 && isConnected && (
+             <div style={{ textAlign: 'center', color: '#aaa', marginTop: '20px', paddingBottom: '10px' }}>No messages yet. Start chatting!</div>
+        )}
+         {!isConnected && (
+             <div style={{ textAlign: 'center', color: '#aaa', marginTop: '20px', paddingBottom: '10px' }}>Connecting...</div>
+        )}
+        {/* Anchor untuk scroll */}
+        <div ref={messagesEndRef} />
       </div>
       <form className="chat-input-form" onSubmit={handleSubmit}>
         <input
@@ -146,12 +191,17 @@ function ChatInterface({ userName, room }: { userName: string; room: string | un
           name="content"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          placeholder={`Chatting as ${userName}...`}
+          placeholder={isConnected ? `Chatting as ${userName}...` : 'Connecting...'}
           autoComplete="off"
           aria-label="Chat message input"
+          disabled={!isConnected}
         />
-        <button type="submit" disabled={inputValue.trim() === ""} aria-label="Send message">
-          <i className="fas fa-paper-plane"></i> {/* Ikon Font Awesome */}
+        <button
+          type="submit"
+          disabled={inputValue.trim() === "" || !isConnected}
+          aria-label="Send message"
+         >
+          <i className="fas fa-paper-plane"></i>
         </button>
       </form>
     </>
@@ -161,38 +211,48 @@ function ChatInterface({ userName, room }: { userName: string; room: string | un
 // Komponen App Utama (mengatur logika input nama atau tampilkan chat)
 function App() {
   const [currentUser, setCurrentUser] = useState<string | null>(() => {
-    return localStorage.getItem("chatUserName"); // Coba ambil nama dari localStorage
+    // Coba ambil nama dari localStorage saat komponen pertama kali mount
+    const savedName = localStorage.getItem("chatUserName");
+    console.log("[App Init] localStorage name:", savedName);
+    return savedName;
   });
-  const { room } = useParams(); // Ambil room ID dari URL
+  const { room } = useParams();
 
   const handleNameSubmit = (name: string) => {
-    localStorage.setItem("chatUserName", name); // Simpan nama ke localStorage
+    console.log("[App Action] Name submitted:", name);
+    localStorage.setItem("chatUserName", name);
     setCurrentUser(name);
   };
 
+  // Render berdasarkan apakah currentUser sudah ada
   if (!currentUser) {
-    // Jika tidak ada nama, tampilkan form input nama
+    console.log("[App Render] Rendering NameInput");
     return <NameInput onNameSubmit={handleNameSubmit} />;
+  } else {
+    console.log(`[App Render] Rendering ChatInterface for user: ${currentUser}, room: ${room}`);
+    // Menggunakan key di sini bisa membantu me-reset state jika diperlukan, tapi mungkin tidak perlu untuk masalah refresh.
+    // return <ChatInterface key={`${room}-${currentUser}`} userName={currentUser} room={room} />;
+    return <ChatInterface userName={currentUser} room={room} />;
   }
-
-  // Jika nama sudah ada, tampilkan antarmuka chat
-  return <ChatInterface userName={currentUser} room={room} />;
 }
 
 // Logika Rendering Utama
 const container = document.getElementById("root");
 if (container) {
+  console.log("[Main] Mounting React App");
   createRoot(container).render(
+    // StrictMode dapat menyebabkan beberapa efek dijalankan dua kali dalam development,
+    // perhatikan log jika ada perilaku ganda yang tidak diharapkan.
     <React.StrictMode>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Navigate to={`/${nanoid()}`} />} /> {/* Redirect ke room acak jika akses root */}
-          <Route path="/:room" element={<App />} /> {/* Rute untuk room spesifik */}
-          <Route path="*" element={<Navigate to="/" />} /> {/* Fallback redirect */}
+          <Route path="/" element={<Navigate to={`/${nanoid()}`} />} />
+          <Route path="/:room" element={<App />} />
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </BrowserRouter>
     </React.StrictMode>
   );
 } else {
-  console.error("Failed to find the root element to mount the React app.");
+  console.error("[Main] Failed to find the root element to mount the React app.");
 }
