@@ -22,7 +22,7 @@ body, html {
   border-right: 1px solid #dee2e6;
   box-sizing: border-box;
   overflow-y: auto;
-  transition: width 0.3s ease;
+  transition: width 0.3s ease, padding 0.3s ease; /* Added padding transition */
 }
 
 .sidebar h4 {
@@ -30,25 +30,86 @@ body, html {
   color: #007bff;
 }
 
-/* INI BAGIAN PENTING UNTUK LAYOUT CHAT */
+/* Chat Main Area Layout */
 .chat-main {
-  flex-grow: 1; /* Takes remaining space */
-  display: flex; /* WAJIB ADA */
-  flex-direction: column; /* WAJIB ADA: items (messages, form) stacked vertically */
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
   background-color: #ffffff;
-  overflow: hidden; /* Kontainer utama tidak scroll, area pesan yang scroll */
+  overflow: hidden;
 }
 
+/* Name Input Styling */
+.name-input-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.name-input-form {
+  background-color: #ffffff;
+  padding: 30px 40px;
+  border-radius: 8px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  width: 100%;
+  max-width: 400px;
+}
+
+.name-input-form h2 {
+  margin-top: 0;
+  margin-bottom: 25px;
+  color: #333;
+  font-size: 1.8em;
+}
+
+.name-input-form input[type="text"] {
+  width: 100%;
+  padding: 12px 15px;
+  margin-bottom: 20px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  font-size: 1em;
+  box-sizing: border-box;
+}
+
+.name-input-form input[type="text"]:focus {
+  border-color: #80bdff;
+  outline: 0;
+  box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.name-input-form button {
+  padding: 12px 25px;
+  background-color: #28a745;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1em;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+  width: 100%;
+}
+
+.name-input-form button:hover {
+  background-color: #218838;
+}
+
+
+/* Chat Area Specifics */
 .chat-messages {
-  flex-grow: 1; /* WAJIB ADA: messages area takes all available vertical space */
-  overflow-y: auto; /* Allows scrolling for messages */
+  flex-grow: 1;
+  overflow-y: auto;
   padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 12px; /* Space between messages */
+  gap: 12px;
 }
-/* AKHIR BAGIAN PENTING UNTUK LAYOUT CHAT */
-
 
 .message-item {
   display: flex;
@@ -98,13 +159,14 @@ body, html {
   font-size: 1em;
 }
 
-/* Input Area */
+/* Input Area Form */
 .chat-input-form {
   display: flex;
+  align-items: center;
   padding: 15px;
   border-top: 1px solid #dee2e6;
   background-color: #f8f9fa;
-  /* flex-shrink: 0; JANGAN BIARKAN INPUT AREA MENGECIL, jika diperlukan */
+  flex-shrink: 0; /* Prevent form from shrinking */
 }
 
 .chat-input-form input[type="text"] {
@@ -115,6 +177,7 @@ body, html {
   margin-right: 10px;
   font-size: 1em;
   box-sizing: border-box;
+  min-height: 40px;
 }
 
 .chat-input-form input[type="text"]:focus {
@@ -124,14 +187,20 @@ body, html {
 }
 
 .chat-input-form button {
-  padding: 10px 20px;
   background-color: #007bff;
   color: white;
   border: none;
-  border-radius: 20px;
+  border-radius: 50%;
   cursor: pointer;
-  font-size: 1em;
   transition: background-color 0.2s ease;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1em;
+  flex-shrink: 0;
 }
 
 .chat-input-form button:hover {
@@ -140,16 +209,21 @@ body, html {
 
 .chat-input-form button:disabled {
   background-color: #cccccc;
+  color: #888888;
   cursor: not-allowed;
+}
+
+.chat-input-form button i {
+  line-height: 1;
 }
 
 /* Responsive Adjustments */
 @media (max-width: 768px) {
   .sidebar {
-    width: 0; /* Hide sidebar */
-    padding: 0;
+    width: 0;
+    padding: 0; /* Remove padding when hidden */
     border-right: none;
-    overflow: hidden; /* Make sure content doesn't spill */
+    overflow: hidden;
   }
 
   .message-item {
